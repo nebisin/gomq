@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -24,12 +26,12 @@ func main() {
 	// declare a queue
 	// because we might start the consumer before the publisher
 	// we want to make sure the queue exist
-	q, err := ch.QueueDeclare("hello", false, false, false, false, nil)
+	q, err := ch.QueueDeclare("task_queue", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to declare a queue", err)
 	}
 
-	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to register a consumer", err)
 	}
@@ -41,6 +43,12 @@ func main() {
 	go func() {
 		for d := range msgs {
 			log.Printf("Received a message: %s", d.Body)
+
+			dotCount := bytes.Count(d.Body, []byte("."))
+			t := time.Duration(dotCount)
+			time.Sleep(t * time.Second)
+			log.Println("Done")
+			d.Ack(false)
 		}
 	}()
 

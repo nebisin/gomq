@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -22,18 +24,34 @@ func main() {
 	defer ch.Close()
 
 	// declare a queue
-	q, err := ch.QueueDeclare("hello", false, false, false, false, nil)
+	q, err := ch.QueueDeclare("task_queue", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to declare a queue", err)
 	}
 
+	err = ch.Qos(1, 0, false)
+	if err != nil {
+		log.Fatal("failed to set QoS", err)
+	}
+
+	body := bodyFrom(os.Args)
 	// publish a message to the queue
-	body := "Hello World!"
 	err = ch.Publish("", q.Name, false, false, amqp.Publishing{
-		ContentType: "text/plain",
-		Body:        []byte(body),
+		DeliveryMode: amqp.Persistent,
+		ContentType:  "text/plain",
+		Body:         []byte(body),
 	})
 	if err != nil {
 		log.Fatal("failed to publish a message", err)
 	}
+}
+
+func bodyFrom(args []string) (s string) {
+	if len(args) < 2 || os.Args[1] == "" {
+		s = "hello"
+	} else {
+		s = strings.Join(args[1:], " ")
+	}
+
+	return
 }
