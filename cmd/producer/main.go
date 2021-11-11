@@ -24,14 +24,14 @@ func main() {
 	defer ch.Close()
 
 	// declare an exchange
-	err = ch.ExchangeDeclare("logs", "fanout", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("logs_direct", "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to declare an exchange", err)
 	}
 
 	body := bodyFrom(os.Args)
 	// publish a message to the queue
-	err = ch.Publish("logs", "", false, false, amqp.Publishing{
+	err = ch.Publish("logs_direct", severityFrom(os.Args), false, false, amqp.Publishing{
 		ContentType: "text/plain",
 		Body:        []byte(body),
 	})
@@ -43,10 +43,20 @@ func main() {
 }
 
 func bodyFrom(args []string) (s string) {
-	if len(args) < 2 || os.Args[1] == "" {
+	if len(args) < 3 || os.Args[2] == "" {
 		s = "hello"
 	} else {
-		s = strings.Join(args[1:], " ")
+		s = strings.Join(args[2:], " ")
+	}
+
+	return
+}
+
+func severityFrom(args []string) (s string) {
+	if (len(args) < 2) || os.Args[1] == "" {
+		s = "info"
+	} else {
+		s = os.Args[1]
 	}
 
 	return

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -22,7 +23,7 @@ func main() {
 	defer ch.Close()
 
 	// declare an exchange
-	err = ch.ExchangeDeclare("logs", "fanout", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("logs_direct", "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to declare an exchange", err)
 	}
@@ -36,11 +37,25 @@ func main() {
 		log.Fatal("failed to declare a queue", err)
 	}
 
-	// Now we need to tell the exchange to send messages to our queue.
-	// That relationship between exchange and a queue is called a binding.
-	err = ch.QueueBind(q.Name, "", "logs", false, nil)
-	if err != nil {
-		log.Fatal("failed to bind a queue", err)
+	// we're going to create a new binding for each severity we're interested in.
+	if len(os.Args) < 2 {
+		log.Printf("Usage %s [info] [warning] [error]", os.Args[0])
+		os.Exit(0)
+	}
+
+	for _, s := range os.Args[1:] {
+		log.Printf("Binding queue %s to exchange %s with routing key %s", q.Name, "logs_direct", s)
+
+		err = ch.QueueBind(
+			q.Name,        // queue name
+			s,             // routing key
+			"logs_direct", // exchange
+			false,
+			nil,
+		)
+		if err != nil {
+			log.Fatal("failed to bind a queue", err)
+		}
 	}
 
 	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
