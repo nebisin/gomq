@@ -23,27 +23,23 @@ func main() {
 	}
 	defer ch.Close()
 
-	// declare a queue
-	q, err := ch.QueueDeclare("task_queue", true, false, false, false, nil)
+	// declare an exchange
+	err = ch.ExchangeDeclare("logs", "fanout", true, false, false, false, nil)
 	if err != nil {
-		log.Fatal("failed to declare a queue", err)
-	}
-
-	err = ch.Qos(1, 0, false)
-	if err != nil {
-		log.Fatal("failed to set QoS", err)
+		log.Fatal("failed to declare an exchange", err)
 	}
 
 	body := bodyFrom(os.Args)
 	// publish a message to the queue
-	err = ch.Publish("", q.Name, false, false, amqp.Publishing{
-		DeliveryMode: amqp.Persistent,
-		ContentType:  "text/plain",
-		Body:         []byte(body),
+	err = ch.Publish("logs", "", false, false, amqp.Publishing{
+		ContentType: "text/plain",
+		Body:        []byte(body),
 	})
 	if err != nil {
 		log.Fatal("failed to publish a message", err)
 	}
+
+	log.Printf(" [x] Sent %s\n", body)
 }
 
 func bodyFrom(args []string) (s string) {

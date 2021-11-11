@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"log"
-	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -23,15 +21,29 @@ func main() {
 	}
 	defer ch.Close()
 
-	// declare a queue
-	// because we might start the consumer before the publisher
-	// we want to make sure the queue exist
-	q, err := ch.QueueDeclare("task_queue", false, false, false, false, nil)
+	// declare an exchange
+	err = ch.ExchangeDeclare("logs", "fanout", true, false, false, false, nil)
+	if err != nil {
+		log.Fatal("failed to declare an exchange", err)
+	}
+
+	// Firstly, whenever we connect to Rabbit we need a fresh, empty queue.
+	// Secondly, once we disconnect the consumer the queue should be automatically deleted.
+	// When we supply queue name as an empty string, we create a non-durable queue with a generated name
+	// When the connection that declared it closes, the queue will be deleted because it is declared as exclusive.
+	q, err := ch.QueueDeclare("", false, false, true, false, nil)
 	if err != nil {
 		log.Fatal("failed to declare a queue", err)
 	}
 
-	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	// Now we need to tell the exchange to send messages to our queue.
+	// That relationship between exchange and a queue is called a binding.
+	err = ch.QueueBind(q.Name, "", "logs", false, nil)
+	if err != nil {
+		log.Fatal("failed to bind a queue", err)
+	}
+
+	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal("failed to register a consumer", err)
 	}
@@ -43,12 +55,6 @@ func main() {
 	go func() {
 		for d := range msgs {
 			log.Printf("Received a message: %s", d.Body)
-
-			dotCount := bytes.Count(d.Body, []byte("."))
-			t := time.Duration(dotCount)
-			time.Sleep(t * time.Second)
-			log.Println("Done")
-			d.Ack(false)
 		}
 	}()
 
